@@ -1,11 +1,11 @@
 import Discord from "discord.js";
-import { Ollama } from "ollama";
+import { pipeline } from "@transformers/transformers";
 import config from "./config.json" assert { type: "json" };
 import errorHandler from "./src/error.js";
 import { ActivityType } from "discord.js";
+import slashCommands from "./src/slashCommands.js";
 
 async function bruenorBattlehammer() {
-  const ollama = new Ollama({ model: "tinyllama" });
   const client = new Discord.Client({
     intents: [
       "Guilds", // Allows the bot to receive information about the guilds (servers) it is in
@@ -31,22 +31,12 @@ async function bruenorBattlehammer() {
     } catch (error) {
       console.error("Error setting activity:", error);
     }
+    // Function to handle slash commands incoming from Discord (interaction)
+    slashCommands(client, ollama);
   });
 
   client.on("ready", () => {
     console.log(`Logged in as ${client.user.tag}!`);
-  });
-
-  client.on("message", async (message) => {
-    if (message.author.bot || !message.content.startsWith("!dwarf")) return;
-
-    const prompt = message.content.slice(6); // Remove "!dwarf "
-
-    const response = await ollama.generate({
-      prompt: `You are a dwarf in a fantasy world. Respond to the following in a dwarven manner:\n${prompt}`,
-    });
-
-    message.reply(response.text);
   });
 
   //error handler

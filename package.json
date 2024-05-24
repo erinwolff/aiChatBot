@@ -2,6 +2,6 @@
   "type": "module",
   "dependencies": {
     "discord.js": "^14.15.2",
-    "ollama": "^0.5.1"
+    "transformers": "^3.1.0"
   }
 }

@@ -6,6 +6,14 @@ const commands = [
   {
     name: "chat",
     description: "Say something to Bruenor!",
+    options: [
+      {
+        name: "message",
+        description: "Your message to the dwarf.",
+        type: 3, // Type 3 is for string input
+        required: true,
+      },
+    ],
   },
   // Add other commands as needed
 ];
