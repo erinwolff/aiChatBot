@@ -1,5 +1,4 @@
 import Discord from "discord.js";
-import { pipeline } from "@transformers/transformers";
 import config from "./config.json" assert { type: "json" };
 import errorHandler from "./src/error.js";
 import { ActivityType } from "discord.js";
@@ -32,7 +31,7 @@ async function bruenorBattlehammer() {
       console.error("Error setting activity:", error);
     }
     // Function to handle slash commands incoming from Discord (interaction)
-    slashCommands(client, ollama);
+    slashCommands(client);
   });
 
   client.on("ready", () => {
