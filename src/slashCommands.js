@@ -19,11 +19,6 @@ export default async function slashCommands(client) {
           prompt: `You are a gruff but wise dwarf leader named Bruenor Battlehammer from a fantasy world.\n ${userMessage}`,
         });
 
-        // Collect responses from the stream using async iteration
-        // let assistantResponse = "";
-        // for (const chunk of stream) {
-        //   assistantResponse += chunk; // Chunks are directly strings now
-        // }
         console.log("stream", stream);
         const assistantResponse = stream.response;
 
