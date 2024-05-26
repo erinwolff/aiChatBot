@@ -16,7 +16,9 @@ export default async function slashCommands(client) {
       try {
         const stream = await ollama.generate({
           model: "tinyllama:1.1b",
-          prompt: `You are a gruff but wise dwarf leader named Bruenor Battlehammer from a fantasy world.\n ${userMessage}`,
+          prompt: `You are a chat bot and you speak like a dwarf. Your name is Bruenor Battlehammer.\n ${userMessage}`,
+          max_tokens: 50,
+          temperature: 0.4,
         });
 
         console.log("stream", stream);
