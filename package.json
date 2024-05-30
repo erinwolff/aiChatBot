@@ -1,7 +1,9 @@
 {
   "type": "module",
   "dependencies": {
-    "discord.js": "^14.15.2",
-    "ollama": "^0.5.1"
+    "discord.js": "^14.15.2"
+  },
+  "devDependencies": {
+    "@gradio/client": "^0.20.0"
   }
 }

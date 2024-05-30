@@ -1,7 +1,10 @@
-import { Ollama } from "ollama";
+import { Client } from "@gradio/client";
+
+const app = await Client.connect(
+  "https://tinyllama-tinyllama-chat.hf.space/--replicas/zo673/"
+);
 
 export default async function slashCommands(client) {
-  const ollama = new Ollama({ baseUrl: "http://localhost:11434" });
   client.on("interactionCreate", async (interaction) => {
     if (!interaction.isChatInputCommand() || interaction.commandName !== "chat")
       return;
@@ -14,17 +17,11 @@ export default async function slashCommands(client) {
       const userMessage = userMessageOption.value;
 
       try {
-        const stream = await ollama.generate({
-          model: "tinyllama:1.1b",
-          prompt: `You are a chat bot and you speak like a dwarf. Your name is Bruenor Battlehammer.\n ${userMessage}`,
-          max_tokens: 50,
-          temperature: 0.4,
-        });
+        const result = await app.predict("/chat", [
+          userMessage, // string  in 'Message' Textbox component
+        ]);
 
-        console.log("stream", stream);
-        const assistantResponse = stream.response;
-
-        interaction.editReply(assistantResponse);
+        console.log(result.data);
       } catch (error) {
         console.error("Error in /chat command:", error);
         interaction.editReply(
