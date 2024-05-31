@@ -5,11 +5,11 @@ import config from "../config.json" assert { type: "json" };
 const commands = [
   {
     name: "chat",
-    description: "Say something to Bruenor!",
+    description: "Say something to the bot!",
     options: [
       {
         name: "message",
-        description: "Your message to the dwarf.",
+        description: "Your message to the bot.",
         type: 3, // Type 3 is for string input
         required: true,
       },
