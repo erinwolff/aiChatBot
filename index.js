@@ -16,14 +16,11 @@ async function bruenorBattlehammer() {
   // success message once client is logged in
   client.on("ready", (c) => {
     console.log(`Logged in as ${client.user.tag}!`);
-    console.log("Bruenor is online and ready to crack some skulls!");
 
     // Set custom message and presence status
     try {
       client.user.setPresence({
-        activities: [
-          { name: `killing stinkin orcs`, type: ActivityType.Custom },
-        ], // Activity types: Competing, Custom, Listening, Playing, Streaming, Watching
+        activities: [{ name: `eating grass`, type: ActivityType.Custom }], // Activity types: Competing, Custom, Listening, Playing, Streaming, Watching
         status: "online",
       });
       console.log("Activity set successfully");
