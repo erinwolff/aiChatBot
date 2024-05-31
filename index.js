@@ -15,8 +15,6 @@ async function tinyLlamaBot() {
 
   // success message once client is logged in
   client.on("ready", (c) => {
-    console.log(`Logged in as ${client.user.tag}!`);
-
     // Set custom message and presence status
     try {
       client.user.setPresence({
