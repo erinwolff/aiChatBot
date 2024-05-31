@@ -1,8 +1,6 @@
 import { Client } from "@gradio/client";
 
-const app = await Client.connect(
-  "https://tinyllama-tinyllama-chat.hf.space/--replicas/zo673/"
-);
+const app = await Client.connect("erinwolff/endpoint");
 
 export default async function slashCommands(client) {
   client.on("interactionCreate", async (interaction) => {
@@ -17,11 +15,10 @@ export default async function slashCommands(client) {
       const userMessage = userMessageOption.value;
 
       try {
-        const result = await app.predict("/chat", [
-          userMessage, // string  in 'Message' Textbox component
-        ]);
-
-        console.log(result.data);
+        const result = await app.predict("/chat", {
+          input_text: userMessage,
+        });
+        interaction.editReply(result.data[0]);
       } catch (error) {
         console.error("Error in /chat command:", error);
         interaction.editReply(
