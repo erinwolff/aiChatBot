@@ -2,9 +2,9 @@ import Discord from "discord.js";
 import config from "./config.json" assert { type: "json" };
 import errorHandler from "./src/error.js";
 import { ActivityType } from "discord.js";
-import slashCommands from "./src/slashCommands.js";
+import messageHandler from "./src/messageHandler.js";
 
-async function bruenorBattlehammer() {
+async function tinyLlamaBot() {
   const client = new Discord.Client({
     intents: [
       "Guilds", // Allows the bot to receive information about the guilds (servers) it is in
@@ -27,8 +27,8 @@ async function bruenorBattlehammer() {
     } catch (error) {
       console.error("Error setting activity:", error);
     }
-    // Function to handle slash commands incoming from Discord (interaction)
-    slashCommands(client);
+    // Function to handle chat messages incoming from Discord user
+    messageHandler(client);
   });
 
   client.on("ready", () => {
@@ -40,4 +40,4 @@ async function bruenorBattlehammer() {
 
   client.login(config.token);
 }
-bruenorBattlehammer();
+tinyLlamaBot();
