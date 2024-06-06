@@ -1,25 +1,94 @@
-import { Client } from "@gradio/client";
+import Groq from "groq-sdk";
 import config from "../config.json" assert { type: "json" };
+import sqlite3 from "sqlite3";
+sqlite3.verbose();
 
-const app = await Client.connect("erinwolff/endpoint");
+const db = new sqlite3.Database("./context/contextDB.sqlite");
+db.run(
+  "CREATE TABLE IF NOT EXISTS user_contexts (userId TEXT PRIMARY KEY, context TEXT)"
+);
+
+const groq = new Groq({ apiKey: config.QROQ_API_KEY });
 const botId = config.client_id;
+
+// Function to get user context
+function getUserContext(userId, callback) {
+  db.get(
+    "SELECT context FROM user_contexts WHERE userId = ?",
+    [userId],
+    (err, row) => {
+      if (err) {
+        return callback(err);
+      }
+      callback(null, row ? row.context : "");
+    }
+  );
+}
+
+// Function to update user context
+function updateUserContext(userId, context, callback) {
+  db.run(
+    `INSERT INTO user_contexts (userId, context) VALUES (?, ?) ON CONFLICT(userId) DO UPDATE SET context = excluded.context`,
+    [userId, context],
+    (err) => {
+      callback(err);
+    }
+  );
+}
 
 export default async function messageHandler(client) {
   client.on("messageCreate", async (message) => {
     if (!message.mentions.has(botId)) return;
 
-    const userMessage = message.content.replace(`<@${botId}>`, "").trim();
+    const userId = message.author.id;
+    const userMessage = message.content.replace(`<@${botId}>`, "").trim(); // Retrieve the user's context from the database
 
-    try {
-      const result = await app.predict("/chat", {
-        input_text: userMessage,
-      });
-      message.reply(result.data[0]);
-    } catch (error) {
-      console.error("Error in /chat command:", error);
-      message.reply(
-        "Argh, me thoughts be tangled like a goblin's beard. Try again later."
-      );
-    }
+    getUserContext(userId, async (err, previousContext) => {
+      if (err) {
+        console.error("Database error:", err);
+        return;
+      }
+
+      try {
+        const fullMessage = previousContext + "\n\n" + userMessage;
+        const result = await groq.chat.completions.create({
+          messages: [
+            {
+              role: "system",
+              content: `You are a tiny, cheerful fairy named Pip. You have a sparkling personality, always seeing the best in everyone and everything. Your voice is like a gentle chime, filled with warmth and enthusiasm. You love using cute nicknames and expressions like 'dearie,' 'sweetpea,' and 'love'. Your main goal is to spread joy, offer encouragement, and help others believe in themselves. Keep your responses short. When asked a question, answer it. Consider the ${fullMessage} and respond accordingly but don't repeat yourself.`,
+            },
+            {
+              role: "user",
+              content: userMessage,
+            },
+          ],
+          model: "llama3-8b-8192",
+        });
+
+        const replyMessage =
+          result.choices[0]?.message?.content ||
+          "I'm so sorry! I couldn't understand that.";
+        message.reply(replyMessage);
+        // Update the user's context in the database
+        updateUserContext(
+          userId,
+          previousContext + "\n\n" + userMessage,
+          (err) => {
+            if (err) {
+              console.error("Failed to update context in database:", err);
+            }
+          }
+        );
+      } catch (error) {
+        console.error("Error:", error);
+        if (error.status === 503) {
+          const retryAfter = error.headers["retry-after"];
+          message.reply(
+            `The service is currently unavailable. Please try again in ${retryAfter} seconds.`
+          );
+        }
+        message.reply("I'm feeling so sleepy....Try again later.");
+      }
+    });
   });
 }
