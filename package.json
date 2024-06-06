@@ -1,9 +1,8 @@
 {
   "type": "module",
   "dependencies": {
-    "discord.js": "^14.15.2"
-  },
-  "devDependencies": {
-    "@gradio/client": "^0.20.0"
+    "discord.js": "^14.15.2",
+    "groq-sdk": "^0.4.0",
+    "sqlite3": "^5.1.7"
   }
 }
