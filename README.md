@@ -1,5 +1,5 @@
 # AI Chatbot Playground
-This project is a playground for experimenting with AI-powered chatbots. Currently, it leverages Groq as the API endpoint to harness the power of the llama3-8b-8192 language model. 
+This project is a playground for experimenting with AI-powered chatbots. Currently, it leverages Groq as the API endpoint to harness the power of the llama3-70b-8192 language model. 
 
 **Active Personality**: Pip, a charming fairy chatbot, is here to delight you with cheerful conversations and positive interactions.
 
