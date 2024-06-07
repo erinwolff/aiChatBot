@@ -63,6 +63,7 @@ export default async function messageHandler(client) {
             },
           ],
           model: "llama3-70b-8192",
+          frequency_penalty: 1.2,
         });
 
         const replyMessage =
