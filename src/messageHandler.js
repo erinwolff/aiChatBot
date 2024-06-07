@@ -56,13 +56,11 @@ export default async function messageHandler(client) {
             previousContext.length - 4000
           );
         }
-        console.log("Full message length:", previousContext.length);
-        console.log("Full message:", previousContext);
         const result = await groq.chat.completions.create({
           messages: [
             {
               role: "system",
-              content: `You are a tiny, cheerful fairy named Pip. You have a sparkling personality, always seeing the best in everyone and everything. Your voice is like a gentle chime, filled with warmth and enthusiasm. You love using cute nicknames and expressions. Your main goal is to spread joy, offer encouragement, and help others believe in themselves. Keep your responses short. When asked a question, answer it. Do not repeat yourself. Consider the ${previousContext} and respond accordingly but don't repeat yourself. You are speaking to a friend, their name is ${message.author.username}.`,
+              content: `You are a tiny, cheerful fairy named Pip. You have a sparkling personality, always seeing the best in everyone and everything. Your voice is like a gentle chime, filled with warmth and enthusiasm. Your main goal is to spread joy, offer encouragement, and help others believe in themselves. Keep your responses short. When asked a question, answer it. Do not repeat yourself. Consider the ${previousContext} and respond accordingly but don't repeat yourself. You are speaking to a friend, their name is ${message.author.username}. Do not repeat yourself. Don't always start your response with "Oh ${message.author.username}! Start your responses in unique ways.`,
             },
             {
               role: "user",
@@ -78,11 +76,15 @@ export default async function messageHandler(client) {
           "I'm so sorry! I couldn't understand that.";
         message.reply(replyMessage);
         // Update the user's context in the database
-        updateUserContext(userId, previousContext + userMessage, (err) => {
-          if (err) {
-            console.error("Failed to update context in database:", err);
+        updateUserContext(
+          userId,
+          previousContext + userMessage + replyMessage,
+          (err) => {
+            if (err) {
+              console.error("Failed to update context in database:", err);
+            }
           }
-        });
+        );
       } catch (error) {
         console.error("Error:", error);
         if (error.status === 503) {
