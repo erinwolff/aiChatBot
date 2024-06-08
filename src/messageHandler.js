@@ -5,37 +5,39 @@ sqlite3.verbose();
 
 const db = new sqlite3.Database("./context/contextDB.sqlite");
 db.run(
-  "CREATE TABLE IF NOT EXISTS user_contexts (userId TEXT PRIMARY KEY, context TEXT)"
+  "CREATE TABLE IF NOT EXISTS shared_context (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, content TEXT)"
 );
 
 const groq = new Groq({ apiKey: config.QROQ_API_KEY });
 const botId = config.client_id;
 
-// Function to get user context
-function getUserContext(userId, callback) {
-  db.get(
-    "SELECT context FROM user_contexts WHERE userId = ?",
-    [userId],
-    (err, row) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null, row ? row.context : "");
-    }
-  );
-}
+// Function to get/update shared context
+function getAndUpdateSharedContext(callback) {
+  db.all(
+    "SELECT userId, content FROM shared_context ORDER BY id DESC LIMIT 50", // Get latest 50 entries
+    (err, rows) => {
+      if (err) return callback(err);
 
-// Function to update user context
-function updateUserContext(userId, context, callback) {
-  // if the length of context is greater than 4000, slice it
-  if (context.length > 4000) {
-    context = context.slice(context.length - 4000);
-  }
-  db.run(
-    `INSERT INTO user_contexts (userId, context) VALUES (?, ?) ON CONFLICT(userId) DO UPDATE SET context = excluded.context`,
-    [userId, context],
-    (err) => {
-      callback(err);
+      let context = rows
+        .map((row) => `### ${row.userId}: ${row.content}`)
+        .join("\n");
+
+      // Trim if exceeding length
+      if (context.length > 4000) {
+        context = context.slice(context.length - 4000);
+      }
+
+      // Delete older entries
+      db.run(
+        "DELETE FROM shared_context WHERE id NOT IN (SELECT id FROM shared_context ORDER BY id DESC LIMIT 50)",
+        (err) => {
+          if (err) {
+            console.error("Failed to delete old context entries:", err);
+          }
+        }
+      );
+
+      callback(null, context);
     }
   );
 }
@@ -57,24 +59,18 @@ export default async function messageHandler(client) {
 
     // Retrieve the user's context from the database
 
-    getUserContext(userId, async (err, previousContext) => {
+    getAndUpdateSharedContext(async (err, context) => {
       if (err) {
         console.error("Database error:", err);
         return;
       }
-
+      console.log("Context:", context);
       try {
-        // if previousContext.length > 4000, slice it
-        if (previousContext.length > 4000) {
-          previousContext = previousContext.slice(
-            previousContext.length - 4000
-          );
-        }
         const result = await groq.chat.completions.create({
           messages: [
             {
               role: "system",
-              content: `You are a tiny fairy named Pip. You have a snarky, chaotic personality but keep it subtle and cute. Do not explicitly mention your personality traits. Your responses should be short and intriguing, with a touch of wit or sarcasm. Answer questions directly, but don't be afraid to add a playful twist or innuendo. Avoid pet names and repetition. Remember the ${previousContext} when formulating your responses.The person messaging you is ${userDisplayName}. If they mention another user (<@....>), treat them as a separate individual. Start your responses naturally, like you would in a conversation. Don't always refer to ${userDisplayName}. Use emotes and emojis very rarely, only when absolutely necessary to convey a specific emotion or tone.`,
+              content: `You are a tiny fairy named Pip. You have a snarky, chaotic personality but keep it subtle and cute. Do not explicitly mention your personality traits. Your responses should be short and intriguing, with a touch of wit or sarcasm. Answer questions directly, but don't be afraid to add a playful twist or innuendo. Avoid pet names and repetition. Consider the entire ${context} when formulating your responses (each interaction is separated by ###). The long number after ### is the person's name, to be formatted like this: <@NUMBER_GOES_HERE>. That is the person's name. The current user you are responding to is ${userDisplayName}. If they mention another person (<@USER_ID_HERE>), that is their name. Start your responses naturally, like you would in a conversation. Don't always refer to ${userDisplayName}. Use emotes and emojis very rarely, only when absolutely necessary to convey a specific emotion or tone.`,
             },
             {
               role: "user",
@@ -89,13 +85,14 @@ export default async function messageHandler(client) {
           result.choices[0]?.message?.content ||
           "I'm so sorry! I couldn't understand that.";
         message.reply(replyMessage);
-        // Update the user's context in the database
-        updateUserContext(
-          userId,
-          previousContext + userMessage + replyMessage,
+
+        // Update the shared context with user ID
+        db.run(
+          "INSERT INTO shared_context (userId, content) VALUES (?, ?)",
+          [userId, userMessage + replyMessage],
           (err) => {
             if (err) {
-              console.error("Failed to update context in database:", err);
+              console.error("Failed to update context:", err);
             }
           }
         );
