@@ -64,7 +64,7 @@ export default async function messageHandler(client) {
         console.error("Database error:", err);
         return;
       }
-      console.log("Context:", context);
+
       try {
         const result = await groq.chat.completions.create({
           messages: [
