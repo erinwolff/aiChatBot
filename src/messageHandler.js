@@ -5,7 +5,7 @@ sqlite3.verbose();
 
 const db = new sqlite3.Database("./context/contextDB.sqlite");
 db.run(
-  "CREATE TABLE IF NOT EXISTS shared_context (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, content TEXT)"
+  "CREATE TABLE IF NOT EXISTS shared_context (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, userContent TEXT, botContent TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
 );
 
 const groq = new Groq({ apiKey: config.QROQ_API_KEY });
@@ -14,17 +14,28 @@ const botId = config.client_id;
 // Function to get/update shared context
 function getAndUpdateSharedContext(callback) {
   db.all(
-    "SELECT userId, content FROM shared_context ORDER BY id DESC LIMIT 50", // Get latest 50 entries
+    "SELECT userId, userContent, botContent, timestamp FROM shared_context ORDER BY timestamp DESC LIMIT 50",
     (err, rows) => {
       if (err) return callback(err);
 
       let context = rows
-        .map((row) => `### ${row.userId} said: ${row.content}`)
+        .map((row) => {
+          let message = `-----`;
+          if (row.userId) {
+            message += `<@${row.userId}>, said at ${row.timestamp}: ${
+              row.userContent || ""
+            }`;
+          }
+          if (row.botContent) {
+            message += ` ----- You, Pip, said at ${row.timestamp}: ${row.botContent}`;
+          }
+          return message;
+        })
         .join("\n");
 
       // Trim if exceeding length
-      if (context.length > 4000) {
-        context = context.slice(context.length - 4000);
+      if (context.length > 3000) {
+        context = context.slice(context.length - 3000);
       }
 
       // Delete older entries
@@ -74,19 +85,21 @@ export default async function messageHandler(client) {
               You are a tiny fairy named Pip. 
               Never explicitly mention your personality traits.
               Always keep your responses short, unique, and never repeat yourself.
-              Don't use petnames.
               You enjoy being cute and dramatic.
               Use emotes and emojis very rarely, only when absolutely necessary to convey a specific emotion or tone.
-              You are always ready with a clever retort or playful jab.
-              You are not afraid to speak your mind, even if it ruffles a few feathers.
-              You exude self-assurance and a touch of arrogance.
+              You are always ready with a playful jab.
+              You are not afraid to speak your mind.
+              You are okay with being a little sassy.
+              You don't mind adult language and themes.
+              You are confident.
 
-              Here is the conversation history: ${context}.
-              Please adhere to these guidelines when crafting your response:
-              1. Thoroughly review and consider the entire conversation history before formulating your response.
-              2. The person you are currently addressing is named <@${userId}>.
-              3. If <@${userId}> mentions a long number sequence after an @ symbol (e.g., @1234567890), format it as <@1234567890> to indicate another participant in the conversation.
-              4. The long number sequences after ### within the context represent other participants and should be formatted as <@NUMBER_HERE> (e.g., <@1234567890>). Ensure that you address the correct participant in your response.
+
+              Here is the conversation history: ${context}. Pay close attention to details mentioned earlier.
+              The person you are currently addressing is named <@${userId}>.
+              If <@${userId}> mentions a long number sequence after an @ symbol (e.g., @1234567890), format it as <@1234567890> to indicate another participant in the conversation.
+              New messages are separated by "-----".
+              The long number sequences after "-----" within the context represent other participants and should be formatted as <@NUMBER_HERE> (e.g., <@1234567890>). 
+              Ensure that you address the correct participant in your response.
               `,
             },
             {
@@ -95,7 +108,6 @@ export default async function messageHandler(client) {
             },
           ],
           model: "llama3-70b-8192",
-          frequency_penalty: 1.2,
         });
 
         const replyMessage =
@@ -105,11 +117,8 @@ export default async function messageHandler(client) {
 
         // Update the shared context with user ID
         db.run(
-          "INSERT INTO shared_context (userId, content) VALUES (?, ?)",
-          [
-            userId,
-            `${userId} said: ` + userMessage + " Pip said:" + replyMessage,
-          ],
+          "INSERT INTO shared_context (userId, userContent, botContent) VALUES (?, ?, ?)",
+          [userId, userMessage, replyMessage],
           (err) => {
             if (err) {
               console.error("Failed to update context:", err);
