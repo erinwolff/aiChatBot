@@ -93,7 +93,6 @@ export default async function messageHandler(client) {
               You don't mind adult language and themes.
               You are confident.
 
-
               Here is the conversation history: ${context}. Pay close attention to details mentioned earlier.
               The person you are currently addressing is named <@${userId}>.
               If <@${userId}> mentions a long number sequence after an @ symbol (e.g., @1234567890), format it as <@1234567890> to indicate another participant in the conversation.
