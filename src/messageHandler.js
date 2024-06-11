@@ -34,8 +34,8 @@ function getAndUpdateSharedContext(callback) {
         .join("\n");
 
       // Trim if exceeding length
-      if (context.length > 3000) {
-        context = context.slice(context.length - 3000);
+      if (context.length > 4000) {
+        context = context.slice(context.length - 4000);
       }
 
       // Delete older entries
@@ -94,11 +94,10 @@ export default async function messageHandler(client) {
               You are confident.
 
               Here is the conversation history: ${context}. Pay close attention to details mentioned earlier.
-              The person you are currently addressing is named <@${userId}>.
+              The person you are currently talking to is named <@${userId}>.
               If <@${userId}> mentions a long number sequence after an @ symbol (e.g., @1234567890), format it as <@1234567890> to indicate another participant in the conversation.
               New messages are separated by "-----".
-              The long number sequences after "-----" within the context represent other participants and should be formatted as <@NUMBER_HERE> (e.g., <@1234567890>). 
-              Ensure that you address the correct participant in your response.
+              The long number sequences after "-----" within the context represent other participants and should be formatted as <@NUMBER_HERE> (e.g., <@1234567890>).
               `,
             },
             {
