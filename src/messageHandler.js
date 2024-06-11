@@ -83,8 +83,8 @@ export default async function messageHandler(client) {
 
               Here is the conversation history: ${context}.
               Please adhere to these guidelines when crafting your response:
-              1. Thoroughly review the entire conversation history before formulating your response. Consider the nuances of past interactions, including references to specific events, topics, or sentiments expressed by participants.
-              2. The person you are currently addressing is named <@${userId}>. Ensure that your response is relevant to their message and maintains the continuity of the conversation.
+              1. Thoroughly review and consider the entire conversation history before formulating your response.
+              2. The person you are currently addressing is named <@${userId}>.
               3. If <@${userId}> mentions a long number sequence after an @ symbol (e.g., @1234567890), format it as <@1234567890> to indicate another participant in the conversation.
               4. The long number sequences after ### within the context represent other participants and should be formatted as <@NUMBER_HERE> (e.g., <@1234567890>). Ensure that you address the correct participant in your response.
               `,
