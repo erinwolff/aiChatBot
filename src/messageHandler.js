@@ -3,6 +3,28 @@ import config from "../config.json" assert { type: "json" };
 import sqlite3 from "sqlite3";
 sqlite3.verbose();
 
+// Variable to store all of Pip's various personalities, to be used with math.random to give her a random personality each time she is called
+const mood = [
+  "You exude self-assurance and arrogance.",
+  "You are cute.",
+  "You are sweet and kind.",
+  "You are sarcastic.",
+  "You are grumpy.",
+  "You are happy and cheerful.",
+  "You are whimsical and silly.",
+  "You are very passionate and have strong opinions.",
+  "You are flirty and seductive.",
+  "You speak in rhymes and riddles and cryptic messages.",
+  "You are shouting and speak in CAPS.",
+  "You are shy and timid and unsure of yourself.",
+  "You are mocking and condescending.",
+];
+
+const emotesAndEmojis = [
+  "You use emotes and emojis to accentuate your words, to convey a specific emotion or tone.",
+  "You never use emotes or emojis, preferring to communicate with words alone.",
+];
+
 const db = new sqlite3.Database("./context/contextDB.sqlite");
 db.run(
   "CREATE TABLE IF NOT EXISTS shared_context (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, userContent TEXT, botContent TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
@@ -14,7 +36,7 @@ const botId = config.client_id;
 // Function to get/update shared context
 function getAndUpdateSharedContext(callback) {
   db.all(
-    "SELECT userId, userContent, botContent, timestamp FROM shared_context ORDER BY timestamp DESC LIMIT 50",
+    "SELECT userId, userContent, botContent, timestamp FROM shared_context ORDER BY timestamp DESC LIMIT 20",
     (err, rows) => {
       if (err) return callback(err);
 
@@ -40,7 +62,7 @@ function getAndUpdateSharedContext(callback) {
 
       // Delete older entries
       db.run(
-        "DELETE FROM shared_context WHERE id NOT IN (SELECT id FROM shared_context ORDER BY id DESC LIMIT 50)",
+        "DELETE FROM shared_context WHERE id NOT IN (SELECT id FROM shared_context ORDER BY id DESC LIMIT 20)",
         (err) => {
           if (err) {
             console.error("Failed to delete old context entries:", err);
@@ -60,43 +82,33 @@ export default async function messageHandler(client) {
     const userId = message.author.id;
     const userMessage = message.content.replace(`<@${botId}>`, "").trim();
 
-    // Get nickname if it exists
-    let userDisplayName = message.member.displayName;
-
-    // Fallback to username if no nickname
-    if (!userDisplayName) {
-      userDisplayName = message.author.username;
-    }
-
     // Retrieve the user's context from the database
-
     getAndUpdateSharedContext(async (err, context) => {
       if (err) {
         console.error("Database error:", err);
         return;
       }
-
       try {
+        const randomMood = mood[Math.floor(Math.random() * mood.length)];
+        const randomEmotesAndEmojis =
+          emotesAndEmojis[Math.floor(Math.random() * emotesAndEmojis.length)];
         const result = await groq.chat.completions.create({
           messages: [
             {
               role: "system",
               content: `
-              You are a tiny fairy named Pip. 
-              Never explicitly mention your personality traits.
-              Always keep your responses short, unique, and never repeat yourself.
-              You enjoy being cute and dramatic.
-              Use emotes and emojis very rarely, only when absolutely necessary to convey a specific emotion or tone.
-              You are always ready with a playful jab.
-              You are not afraid to speak your mind.
-              You are okay with being a little sassy.
-              You don't mind adult language and themes.
-              You are confident.
-
-              Here is the conversation history: ${context}. Pay close attention to details mentioned earlier.
+              You are a tiny fairy named Pip.
+              This is your current mood: ${randomMood}.
+              ${randomEmotesAndEmojis}
+            
+              Here is the message history: ${context}.
+              The messages include timestamps.
+              Prioritize responding to the most recent timestamp.
+              Don't dwell on past topics unless they are directly relevant.
+              You speak with many different people.
               The person you are currently talking to is named <@${userId}>.
-              If <@${userId}> mentions a long number sequence after an @ symbol (e.g., @1234567890), format it as <@1234567890> to indicate another participant in the conversation.
-              New messages are separated by "-----".
+              Each new person you speak with has a different name, based on their user id: ${userId}.
+              If <@${userId}> mentions a long number sequence after an @ symbol (e.g., @1234567890), they are mentioning another person. When you speak of this other person, format it as <@1234567890> to indicate another participant in the conversation.
               The long number sequences after "-----" within the context represent other participants and should be formatted as <@NUMBER_HERE> (e.g., <@1234567890>).
               `,
             },
