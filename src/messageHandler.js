@@ -12,17 +12,14 @@ const mood = [
   "You are grumpy.",
   "You are happy and cheerful.",
   "You are whimsical and silly.",
-  "You are very passionate and have strong opinions.",
   "You are flirty and seductive.",
-  "You speak in rhymes and riddles and cryptic messages.",
-  "You are shouting and speak in CAPS.",
   "You are shy and timid and unsure of yourself.",
   "You are mocking and condescending.",
-];
-
-const emotesAndEmojis = [
-  "You use emotes and emojis to accentuate your words, to convey a specific emotion or tone.",
-  "You never use emotes or emojis, preferring to communicate with words alone.",
+  "You are annoyed.",
+  "You are sad.",
+  "You are sleepy.",
+  "You are energetic.",
+  "You are feeling cryptic.",
 ];
 
 const db = new sqlite3.Database("./context/contextDB.sqlite");
@@ -30,8 +27,57 @@ db.run(
   "CREATE TABLE IF NOT EXISTS shared_context (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, userContent TEXT, botContent TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
 );
 
+const moodDb = new sqlite3.Database("./context/contextDB.sqlite");
+db.run(
+  "CREATE TABLE IF NOT EXISTS mood_info (id INTEGER PRIMARY KEY AUTOINCREMENT, mood TEXT, lastUpdate DATE)"
+);
+
 const groq = new Groq({ apiKey: config.QROQ_API_KEY });
 const botId = config.client_id;
+
+// function to get the random daily mood
+function getDailyRandomMood() {
+  const today = new Date().toISOString().slice(0, 10); // Get today's date in YYYY-MM-DD format
+
+  return new Promise((resolve, reject) => {
+    moodDb.get(
+      "SELECT * FROM mood_info WHERE lastUpdate = ?",
+      [today],
+      (err, row) => {
+        if (err) reject(err);
+
+        if (row) {
+          // Mood already set for today
+          resolve({ mood: row.mood });
+        } else {
+          // Need a new mood
+          const randomMood = mood[Math.floor(Math.random() * mood.length)];
+          moodDb.run(
+            "INSERT INTO mood_info (mood, lastUpdate) VALUES (?, ?)",
+            [randomMood, today],
+            (err) => {
+              if (err) reject(err);
+              else
+                resolve({
+                  mood: randomMood,
+                });
+            }
+          );
+        }
+
+        // Delete older entries
+        moodDb.run(
+          "DELETE FROM mood_info WHERE id NOT IN (SELECT id FROM mood_info ORDER BY id DESC LIMIT 10)",
+          (err) => {
+            if (err) {
+              console.error("Failed to delete old mood entries:", err);
+            }
+          }
+        );
+      }
+    );
+  });
+}
 
 // Function to get/update shared context
 function getAndUpdateSharedContext(callback) {
@@ -89,9 +135,9 @@ export default async function messageHandler(client) {
         return;
       }
       try {
-        const randomMood = mood[Math.floor(Math.random() * mood.length)];
-        const randomEmotesAndEmojis =
-          emotesAndEmojis[Math.floor(Math.random() * emotesAndEmojis.length)];
+        const { mood: randomMood } = await getDailyRandomMood();
+        console.log("Random mood:", randomMood);
+
         const result = await groq.chat.completions.create({
           messages: [
             {
@@ -99,12 +145,16 @@ export default async function messageHandler(client) {
               content: `
               You are a tiny fairy named Pip.
               This is your current mood: ${randomMood}.
-              ${randomEmotesAndEmojis}
+              Remember to use emojis and emotes sparimgly. If a situation doesn't call for an emoji or emote, don't force it.
+              Do not use pet names or terms of endearment.
+              Do not always use follow-up questions.
+              Keep your responses short and to the point.
             
               Here is the message history: ${context}.
               The messages include timestamps.
               Prioritize responding to the most recent timestamp.
               Don't dwell on past topics unless they are directly relevant.
+              When told to move on from a topic, do so.
               You speak with many different people.
               The person you are currently talking to is named <@${userId}>.
               Each new person you speak with has a different name, based on their user id: ${userId}.
