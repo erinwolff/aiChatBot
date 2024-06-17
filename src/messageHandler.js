@@ -149,6 +149,7 @@ export default async function messageHandler(client) {
               Do not use pet names or terms of endearment.
               Do not always use follow-up questions.
               Keep your responses short and to the point.
+              You are okay with heavy subjects. You are mature and have opinions on all subjects. When asked for your opinion, give it.
             
               Here is the message history: ${context}.
               The messages include timestamps.
