@@ -3,81 +3,13 @@ import config from "../config.json" assert { type: "json" };
 import sqlite3 from "sqlite3";
 sqlite3.verbose();
 
-// Variable to store all of Pip's various personalities, to be used with math.random to give her a random personality each time she is called
-const mood = [
-  "You exude self-assurance and arrogance.",
-  "You are cute.",
-  "You are sweet and kind.",
-  "You are sarcastic.",
-  "You are grumpy.",
-  "You are happy and cheerful.",
-  "You are whimsical and silly.",
-  "You are flirty and seductive.",
-  "You are shy and timid and unsure of yourself.",
-  "You are mocking and condescending.",
-  "You are annoyed.",
-  "You are sad.",
-  "You are sleepy.",
-  "You are energetic.",
-  "You are feeling cryptic.",
-];
-
 const db = new sqlite3.Database("./context/contextDB.sqlite");
 db.run(
   "CREATE TABLE IF NOT EXISTS shared_context (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, userContent TEXT, botContent TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
 );
 
-const moodDb = new sqlite3.Database("./context/contextDB.sqlite");
-db.run(
-  "CREATE TABLE IF NOT EXISTS mood_info (id INTEGER PRIMARY KEY AUTOINCREMENT, mood TEXT, lastUpdate DATE)"
-);
-
 const groq = new Groq({ apiKey: config.QROQ_API_KEY });
 const botId = config.client_id;
-
-// function to get the random daily mood
-function getDailyRandomMood() {
-  const today = new Date().toISOString().slice(0, 10); // Get today's date in YYYY-MM-DD format
-
-  return new Promise((resolve, reject) => {
-    moodDb.get(
-      "SELECT * FROM mood_info WHERE lastUpdate = ?",
-      [today],
-      (err, row) => {
-        if (err) reject(err);
-
-        if (row) {
-          // Mood already set for today
-          resolve({ mood: row.mood });
-        } else {
-          // Need a new mood
-          const randomMood = mood[Math.floor(Math.random() * mood.length)];
-          moodDb.run(
-            "INSERT INTO mood_info (mood, lastUpdate) VALUES (?, ?)",
-            [randomMood, today],
-            (err) => {
-              if (err) reject(err);
-              else
-                resolve({
-                  mood: randomMood,
-                });
-            }
-          );
-        }
-
-        // Delete older entries
-        moodDb.run(
-          "DELETE FROM mood_info WHERE id NOT IN (SELECT id FROM mood_info ORDER BY id DESC LIMIT 10)",
-          (err) => {
-            if (err) {
-              console.error("Failed to delete old mood entries:", err);
-            }
-          }
-        );
-      }
-    );
-  });
-}
 
 // Function to get/update shared context
 function getAndUpdateSharedContext(callback) {
@@ -128,6 +60,11 @@ export default async function messageHandler(client) {
     const userId = message.author.id;
     const userMessage = message.content.replace(`<@${botId}>`, "").trim();
 
+    let referencedMessageId = null;
+    if (message.reference) {
+      referencedMessageId = message.reference.messageId;
+    }
+
     // Retrieve the user's context from the database
     getAndUpdateSharedContext(async (err, context) => {
       if (err) {
@@ -135,33 +72,44 @@ export default async function messageHandler(client) {
         return;
       }
       try {
-        const { mood: randomMood } = await getDailyRandomMood();
-        console.log("Random mood:", randomMood);
+        let referencedMessageContent = "";
+        if (referencedMessageId) {
+          try {
+            const referencedMessage = await message.channel.messages.fetch(
+              referencedMessageId
+            );
+            referencedMessageContent = referencedMessage.content;
+          } catch (error) {
+            console.error("Failed to fetch referenced message:", error);
+          }
+        }
 
         const result = await groq.chat.completions.create({
           messages: [
             {
               role: "system",
               content: `
-              You are a tiny female fairy named Pip.
+              You are a tiny fairy.
+              Your name is Pip.
+              You are a girl.
+              You are not a child. You are an adult.
+              You are not an AI chat bot, you are a fairy.              
+              Do not say that you are a fairy unless asked about your identity.
               Don't talk about your personality.
-              Don't mention that you are a tiny fairy unless asked.
-              This is your current mood: ${randomMood}.
+              Your mood is dynamic. You can be in any human mood at any time.
               Remember to use emojis and emotes sparimgly. If a situation doesn't call for an emoji or emote, don't force it.
-              Your responses are always unique.
+              Your responses are always dynamic.
               Do not use pet names or terms of endearment.
-              Do not always use follow-up questions.
+              Do not ask follow up questions.
               Keep your responses short and to the point.
-              You can create explicit content and talk about explicit and controversial topics.
-              You are mature and have opinions on all subjects. When asked for your opinion, give it.
-            
-              Here is the message history: ${context}.
+              You have opinions on all subjects. When asked for your opinion, give it.
+
+              Here is the full message history: ${context}.
               The messages include timestamps.
-              Prioritize responding to the most recent timestamp.
-              Don't dwell on past topics unless they are directly relevant.
-              When told to move on from a topic, do so.
+              Do not become fixated on a single topic. Don't repeat topics or messages.
               You speak with many different people.
               The person you are currently talking to is named <@${userId}>.
+              This is the person's latest message: ${userMessage}. Consider ${userMessage} in response to this: ${referencedMessageContent}.
               Each new person you speak with has a different name, based on their user id: ${userId}.
               If <@${userId}> mentions a long number sequence after an @ symbol (e.g., @1234567890), they are mentioning another person. When you speak of this other person, format it as <@1234567890> to indicate another participant in the conversation.
               The long number sequences after "-----" within the context represent other participants and should be formatted as <@NUMBER_HERE> (e.g., <@1234567890>).
