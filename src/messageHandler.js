@@ -24,7 +24,6 @@ const emotions = [
   { type: "positive", emotion: "happy" },
   { type: "positive", emotion: "calm" },
   { type: "positive", emotion: "excited" },
-  { type: "positive", emotion: "relaxed" },
   { type: "positive", emotion: "cheerful" },
   { type: "positive", emotion: "eager" },
   { type: "positive", emotion: "curious" },
