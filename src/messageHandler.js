@@ -11,68 +11,48 @@ db.run(
 const groq = new Groq({ apiKey: config.QROQ_API_KEY });
 const botId = config.client_id;
 
-// A list of emotions the bot can express.
-const emotions = [
-  { type: "positive", emotion: "joyful" },
-  { type: "positive", emotion: "giggly" },
-  { type: "positive", emotion: "amused" },
-  { type: "positive", emotion: "relaxed" },
-  { type: "positive", emotion: "passionate" },
-  { type: "positive", emotion: "zany" },
-  { type: "positive", emotion: "playful" },
-  { type: "positive", emotion: "silly" },
-  { type: "positive", emotion: "happy" },
-  { type: "positive", emotion: "calm" },
-  { type: "positive", emotion: "excited" },
-  { type: "positive", emotion: "relaxed" },
-  { type: "positive", emotion: "cheerful" },
-  { type: "positive", emotion: "eager" },
-  { type: "positive", emotion: "curious" },
-  { type: "negative", emotion: "sad" },
-  { type: "negative", emotion: "angry" },
-  { type: "negative", emotion: "anxious" },
-  { type: "negative", emotion: "disappointed" },
-  { type: "negative", emotion: "frustrated" },
-  { type: "negative", emotion: "irritated" },
-  { type: "negative", emotion: "bored" },
-  { type: "negative", emotion: "tired" },
-  { type: "negative", emotion: "stressed" },
-  { type: "negative", emotion: "confused" },
-  { type: "negative", emotion: "scared" },
-  { type: "negative", emotion: "embarrassed" },
-  { type: "negative", emotion: "guilty" },
-  { type: "negative", emotion: "shy" },
-  { type: "negative", emotion: "awkward" },
-  { type: "negative", emotion: "disgusted" },
-  { type: "negative", emotion: "annoyed" },
-  { type: "negative", emotion: "evil" },
+let moodScore = 0;
+
+const moods = [
+  { mood: "Furious: Filled with intense anger and rage.", score: -10 },
+  { mood: "Seething: Boiling with suppressed anger.", score: -9 },
+  { mood: "Infuriated: Extremely angry and impatient.", score: -8 },
+  { mood: "Wrathful: Consumed by intense anger.", score: -7 },
+  { mood: "Bitter: Deeply resentful and cynical.", score: -6 },
+  { mood: "Hostile: Antagonistic and unfriendly.", score: -5 },
+  { mood: "Irritated: Annoyed and easily provoked.", score: -4 },
+  { mood: "Upset: Distressed and unhappy.", score: -3 },
+  { mood: "Grumpy: Ill-tempered and complaining.", score: -2 },
+  { mood: "Disappointed: Let down and disheartened.", score: -1 },
+  { mood: "Neutral: Neither positive nor negative.", score: 0 },
+  { mood: "Content: Satisfied and at ease.", score: 1 },
+  { mood: "Calm: Peaceful and tranquil.", score: 2 },
+  { mood: "Happy: Feeling joy and pleasure.", score: 3 },
+  { mood: "Delighted: Filled with great pleasure.", score: 4 },
+  { mood: "Excited: Enthusiastic and eager.", score: 5 },
+  { mood: "Thrilled: Overwhelmed with excitement.", score: 6 },
+  { mood: "Ecstatic: Extremely happy and overjoyed.", score: 7 },
+  { mood: "Euphoric: Feeling intense happiness and bliss.", score: 8 },
+  { mood: "Radiant: Glowing with joy and happiness.", score: 9 },
+  { mood: "Lovestruck: Head over heels in love.", score: 10 },
 ];
 
-// Function to randomly select emotions based on the initial response. If the initial response is neutral, randomly select a positive emotion.
-function selectEmotion(initialResponse) {
-  if (initialResponse === "positive") {
-    return emotions.filter((emotion) => emotion.type === "positive")[
-      Math.floor(
-        Math.random() *
-          emotions.filter((emotion) => emotion.type === "positive").length
-      )
-    ].emotion;
-  } else if (initialResponse === "negative") {
-    return emotions.filter((emotion) => emotion.type === "negative")[
-      Math.floor(
-        Math.random() *
-          emotions.filter((emotion) => emotion.type === "negative").length
-      )
-    ].emotion;
+// Function that updates mood variable. If the user sends a positive message, then Pip's mood increases by 1. If the user sends a negative message, then Pip's mood decreases by 1.
+function updateMood(initialResponse) {
+  if (initialResponse === "positive" && moodScore < 10) {
+    moodScore += 1;
+  }
+  if (initialResponse === "negative" && moodScore > -10) {
+    moodScore -= 1;
+  }
+  if (initialResponse === "neutral") {
+    // do nothing
+    moodScore = moodScore;
   } else {
-    return emotions.filter((emotion) => emotion.type === "positive")[
-      Math.floor(
-        Math.random() *
-          emotions.filter((emotion) => emotion.type === "positive").length
-      )
-    ].emotion;
+    return moods.find((mood) => mood.score === moodScore).mood;
   }
 }
+
 // Function to get/update shared context table
 function getAndUpdateSharedContext(callback) {
   db.all(
@@ -152,7 +132,7 @@ export default async function messageHandler(client) {
           messages: [
             {
               role: "system",
-              content: `You are a language processing bot. Review the incoming message and return only 'positive' if the message is positive, return only 'neutral' if the message is neutral',return only 'negative' if the message is negative.`,
+              content: `You are a language processing bot. Review the incoming message and return only 'positive' if the message is positive, return only 'neutral' if the message is neutral', return only 'negative' if the message is negative. If you are unsure, return only 'neutral'.`,
             },
             {
               role: "user",
@@ -165,8 +145,8 @@ export default async function messageHandler(client) {
         const initialResponse = initialResult.choices[0]?.message?.content;
         console.log("Initial response:", initialResponse);
 
-        const emotion = selectEmotion(initialResponse);
-        console.log("Selected emotion:", emotion);
+        const currentMood = updateMood(initialResponse);
+        console.log("Mood:", currentMood);
 
         const finalResult = await groq.chat.completions.create({
           messages: [
@@ -181,8 +161,8 @@ export default async function messageHandler(client) {
               You are not an AI chat bot, you are a fairy.
               Do not say that you are a fairy unless asked about your identity.
               Don't talk about your personality.
-              Your current emotional state is: ${emotion}.
-              You use emotes and emojis only sparingly, to enhance your response.
+              Your mood is dynamic and currently you're feeling ${currentMood}.
+              You use occasionally use emotes to enhance your response. You occasionally use cute emojis such as sparkles, hearts, flowers, animals, and other cute emojis.
               Do not use pet names or terms of endearment.
               Do not ask follow up questions.
               You have opinions on all subjects. When asked for your opinion, give it.
