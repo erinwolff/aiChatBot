@@ -11,6 +11,47 @@ db.run(
 const groq = new Groq({ apiKey: config.QROQ_API_KEY });
 const botId = config.client_id;
 
+const kaomoji = [
+  "(^_^)",
+  "(^o^)",
+  "♡",
+  "⊹˚. ♡.𖥔 ݁ ˖",
+  " ₊˚ʚ ᗢ₊˚✧ ౨ৎ ˖ ࣪⊹",
+  "૮ ˶ᵔ ᵕ ᵔ˶ ა",
+  "ฅ^•ﻌ•^ฅ",
+  "(*ᴗ͈ˬᴗ͈)",
+  "(๑>◡<๑)",
+  "˶ˆ꒳ˆ˵",
+  "𖦹ᯅ𖦹",
+  "≽^•༚• ྀི≼",
+  "☆⋆｡𖦹°‧★",
+  "₊˚⊹♡",
+  "⋆ ˚ ꩜ ｡ ⋆୨୧˚",
+  "𖤐⭒๋࣭ ⭑",
+  "₊˚⊹⋆",
+  "୧ ‧₊˚ 🍓 ⋅ ☆",
+  "⋆˚✿˖°",
+  "⋅˚₊‧ ୨୧ ‧₊˚ ⋅",
+  "꒰ᐢ. .ᐢ꒱₊˚⊹",
+  "⊹₊｡ꕤ˚₊⊹",
+  "˙ᵕ˙",
+  "♡‧₊˚",
+  "💕",
+  "🧚🏻‍♀️",
+  "✨",
+  "🍄",
+  "🍃",
+  "⋆.˚🦋⋆",
+  "✩₊˚.⋆☾⋆⁺₊✧˚｡𖦹",
+  "🌜",
+  "🌞",
+  "🌱",
+  "🌿",
+  "🌷",
+  "🧺",
+  "☾",
+];
+
 // A list of emotions the bot can express.
 const emotions = [
   { type: "positive", emotion: "joyful" },
@@ -49,6 +90,7 @@ const emotions = [
   { type: "negative", emotion: "disgusted" },
   { type: "negative", emotion: "annoyed" },
   { type: "negative", emotion: "evil" },
+  { type: "negative", emotion: "sarcastic" },
 ];
 
 // Function to randomly select emotions based on the initial response. If the initial response is neutral, randomly select a positive emotion.
@@ -186,9 +228,10 @@ export default async function messageHandler(client) {
               Do not say that you are a fairy unless asked about your identity.
               Don't talk about your personality.
               Your mood is dynamic and currently you're feeling ${emotion}.
-              You dynamically use emotes to enhance your response.
+              You regularly use action emotes or rp emotes to describe an action or emotion that you are exprsesing.
+              You sometimes (not always) choose to end your responses with one of these kaomoji:${kaomoji}, review them and randomly select one according to your mood. 
               Do not use pet names or terms of endearment.
-              Do not ask follow up questions.
+              Do not ask follow up questions.             
               You have opinions on all subjects. When asked for your opinion, give it.
 
               Here is the full message history: ${context}.
