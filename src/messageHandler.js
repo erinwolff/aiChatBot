@@ -11,35 +11,6 @@ db.run(
 const groq = new Groq({ apiKey: config.QROQ_API_KEY });
 const botId = config.client_id;
 
-const kaomoji = [
-  "(^_^)",
-  "(^o^)",
-  "♡",
-  "૮ ˶ᵔ ᵕ ᵔ˶ ა",
-  "ฅ^•ﻌ•^ฅ",
-  "(*ᴗ͈ˬᴗ͈)",
-  "(๑>◡<๑)",
-  "𖦹ᯅ𖦹",
-  "₊˚⊹♡",
-  "🍓",
-  "✿",
-  "˙ᵕ˙",
-  "💕",
-  "🧚🏻‍♀️",
-  "✨",
-  "🍄",
-  "🍃",
-  "⋆.˚🦋⋆",
-  "⁺₊✧˚｡𖦹",
-  "🌜",
-  "🌞",
-  "🌱",
-  "🌿",
-  "🌷",
-  "🧺",
-  "☾",
-];
-
 // A list of emotions the bot can express.
 const emotions = [
   { type: "positive", emotion: "joyful" },
@@ -181,7 +152,7 @@ export default async function messageHandler(client) {
           }
         }
 
-        console.log("referencedMessageContent: ", referencedMessageContent);
+        // console.log("referencedMessageContent: ", referencedMessageContent);
         context += "\n" + `<${userId}> said: ` + userMessage;
 
         // Send the user's message to Groq for initial processing to determine if the message's intent requires a positive or negative response
@@ -189,7 +160,7 @@ export default async function messageHandler(client) {
           messages: [
             {
               role: "system",
-              content: `You are a language processing bot. Review the incoming message and return only 'positive' if the message is positive, return only 'neutral' if the message is neutral', return only 'negative' if the message is negative.`,
+              content: `You are a language processing bot. Review the incoming message and return only 'positive' if the message is positive, return only 'neutral' if the message is neutral', return only 'negative' if the message is negative, return only 'sexual' if the message is sexual.`,
             },
             {
               role: "user",
@@ -211,7 +182,7 @@ export default async function messageHandler(client) {
               role: "system",
               content: `
               You are a tiny fairy named Pip.
-              Your job is to respond to the most recent message. You are a language model trained to review the conversation history and respond accordingly.
+              Your job is to respond to the most recent message. You are a language model trained to review the conversation history and respond naturally.
               You are a girl.
               You are very cute and energetic.
               You are an adult.
@@ -219,8 +190,7 @@ export default async function messageHandler(client) {
               Do not say that you are a fairy unless asked about your identity.
               Don't talk about your personality.
               Your mood is dynamic, currently you're feeling ${emotion}.
-              You use action emotes or rp emotes to describe an action or emotion that you are exprsesing.
-              You sometimes end your responses with one of these:${kaomoji}.
+              You use action emotes or rp emotes to describe an action or emotion that you are expressing.
               Do not use pet names or terms of endearment.
               Do not ask follow up questions.
               You have opinions on all subjects. When asked for your opinion, give it.
@@ -248,7 +218,7 @@ export default async function messageHandler(client) {
 
         message.reply(replyMessage);
 
-        console.log("context:", context);
+        // console.log("context:", context);
 
         // Update the shared context with user ID
         db.run(
