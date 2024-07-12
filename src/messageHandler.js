@@ -4,9 +4,27 @@ import sqlite3 from "sqlite3";
 sqlite3.verbose();
 
 const db = new sqlite3.Database("./context/contextDB.sqlite");
-db.run(
-  "CREATE TABLE IF NOT EXISTS shared_context (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, username TEXT, userContent TEXT, botContent TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
-);
+
+// Drop the table if it exists
+db.run("DROP TABLE IF EXISTS shared_context", (err) => {
+  if (err) {
+    console.error("Error dropping table:", err);
+  } else {
+    console.log("Table dropped successfully");
+
+    // Create the table again
+    db.run(
+      "CREATE TABLE shared_context (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, username TEXT, userContent TEXT, botContent TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)",
+      (err) => {
+        if (err) {
+          console.error("Error creating table:", err);
+        } else {
+          console.log("Table created successfully");
+        }
+      }
+    );
+  }
+});
 
 const groq = new Groq({ apiKey: config.QROQ_API_KEY });
 const botId = config.client_id;
@@ -107,6 +125,54 @@ function selectEmotion(initialResponse) {
   }
 }
 
+async function fetchUsername(userId) {
+  try {
+    const user = await client.users.fetch(userId);
+    return user.username;
+  } catch (error) {
+    console.error(`Failed to fetch username for userId ${userId}:`, error);
+    return `<UnknownUser:${userId}>`; 
+  }
+}
+
+async function fetchUserId(username) {
+  try {
+    const user = client.users.cache.find((user) => user.username === username);
+    if (user) {
+      return user.id;
+    } else {
+      throw new Error(`User with username ${username} not found`);
+    }
+  } catch (error) {
+    console.error(`Failed to fetch userId for username ${username}:`, error);
+    return null;
+  }
+}
+
+async function replaceUsernamesWithUserIds(message) {
+  const usernameRegex = /<(\w+)>/g;
+  let match;
+  while ((match = usernameRegex.exec(message)) !== null) {
+    const username = match[1];
+    const userId = await fetchUserId(username);
+    if (userId) {
+      message = message.replace(`<${username}>`, `<@${userId}>`);
+    }
+  }
+  return message;
+}
+
+async function replaceUserIdsWithUsernames(message) {
+  const userIdRegex = /<@(\d+)>/g;
+  let match;
+  while ((match = userIdRegex.exec(message)) !== null) {
+    const userId = match[1];
+    const username = await fetchUsername(userId);
+    message = message.replace(`<@${userId}>`, `<${username}>`);
+  }
+  return message;
+}
+
 // Function to get/update shared context table
 function getAndUpdateSharedContext(callback) {
   db.all(
@@ -154,14 +220,10 @@ export default async function messageHandler(client) {
     if (!message.mentions.has(botId)) return;
 
     const userId = message.author.id;
-    const userMessage = message.content.replace(`<@${botId}>`, "").trim();
+    const userMessage = await replaceUserIdsWithUsernames(userMessage).trim();
+
     console.log("full user  message: ", message);
     console.log("userMessage: ", userMessage);
-
-    let referencedMessageId = null;
-    if (message.reference) {
-      referencedMessageId = message.reference.messageId;
-    }
 
     // Retrieve the user's context from the database
     getAndUpdateSharedContext(async (err, context) => {
@@ -170,18 +232,6 @@ export default async function messageHandler(client) {
         return;
       }
       try {
-        let referencedMessageContent = "";
-        if (referencedMessageId) {
-          try {
-            const referencedMessage = await message.channel.messages.fetch(
-              referencedMessageId
-            );
-            referencedMessageContent = referencedMessage.content;
-          } catch (error) {
-            console.error("Failed to fetch referenced message:", error);
-          }
-        }
-        console.log("referencedMessageContent: ", referencedMessageContent);
         context += "\n" + `<${message.author.username}> said: ` + userMessage;
 
         // Send the user's message to Groq for initial processing to determine if the message's intent requires a positive or negative response
@@ -223,8 +273,9 @@ export default async function messageHandler(client) {
           finalResult.choices[0]?.message?.content ||
           "I'm so sorry! I couldn't understand that.";
 
-        message.reply(replyMessage);
+        const replacedUserNames = await replaceUsernamesWithUserIds(replyMessage);
 
+        message.reply(replacedUserNames);
         console.log("context:", context);
 
         // Update the shared context with user ID
