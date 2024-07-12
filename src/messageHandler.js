@@ -5,7 +5,7 @@ sqlite3.verbose();
 
 const db = new sqlite3.Database("./context/contextDB.sqlite");
 db.run(
-  "CREATE TABLE IF NOT EXISTS shared_context (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, userContent TEXT, botContent TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
+  "CREATE TABLE IF NOT EXISTS shared_context (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, username TEXT, userContent TEXT, botContent TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
 );
 
 const groq = new Groq({ apiKey: config.QROQ_API_KEY });
@@ -15,34 +15,22 @@ const kaomoji = [
   "(^_^)",
   "(^o^)",
   "♡",
-  "⊹˚. ♡.𖥔 ݁ ˖",
-  " ₊˚ʚ ᗢ₊˚✧ ౨ৎ ˖ ࣪⊹",
   "૮ ˶ᵔ ᵕ ᵔ˶ ა",
   "ฅ^•ﻌ•^ฅ",
   "(*ᴗ͈ˬᴗ͈)",
   "(๑>◡<๑)",
-  "˶ˆ꒳ˆ˵",
   "𖦹ᯅ𖦹",
-  "≽^•༚• ྀི≼",
-  "☆⋆｡𖦹°‧★",
   "₊˚⊹♡",
-  "⋆ ˚ ꩜ ｡ ⋆୨୧˚",
-  "𖤐⭒๋࣭ ⭑",
-  "₊˚⊹⋆",
-  "୧ ‧₊˚ 🍓 ⋅ ☆",
-  "⋆˚✿˖°",
-  "⋅˚₊‧ ୨୧ ‧₊˚ ⋅",
-  "꒰ᐢ. .ᐢ꒱₊˚⊹",
-  "⊹₊｡ꕤ˚₊⊹",
+  "🍓",
+  "✿",
   "˙ᵕ˙",
-  "♡‧₊˚",
   "💕",
   "🧚🏻‍♀️",
   "✨",
   "🍄",
   "🍃",
   "⋆.˚🦋⋆",
-  "✩₊˚.⋆☾⋆⁺₊✧˚｡𖦹",
+  "⁺₊✧˚｡𖦹",
   "🌜",
   "🌞",
   "🌱",
@@ -122,20 +110,20 @@ function selectEmotion(initialResponse) {
 // Function to get/update shared context table
 function getAndUpdateSharedContext(callback) {
   db.all(
-    "SELECT userId, userContent, botContent, timestamp FROM shared_context ORDER BY timestamp DESC LIMIT 20",
+    "SELECT userId, username, userContent, botContent, timestamp FROM shared_context ORDER BY timestamp DESC LIMIT 20",
     (err, rows) => {
       if (err) return callback(err);
 
       let context = rows
         .map((row) => {
-          let message = `||`;
-          if (row.userId) {
-            message += `<@${row.userId}> said at ${row.timestamp}: ${
+          let message = `\n`;
+          if (row.username) {
+            message += `<${message.author.username}> said: ${
               row.userContent || ""
             }`;
           }
           if (row.botContent) {
-            message += `|| Pip said at ${row.timestamp}: ${row.botContent}`;
+            message += `\n You said: ${row.botContent}`;
           }
           return message;
         })
@@ -167,6 +155,7 @@ export default async function messageHandler(client) {
 
     const userId = message.author.id;
     const userMessage = message.content.replace(`<@${botId}>`, "").trim();
+    console.log("full user  message: ", message);
     console.log("userMessage: ", userMessage);
 
     let referencedMessageId = null;
@@ -192,6 +181,8 @@ export default async function messageHandler(client) {
             console.error("Failed to fetch referenced message:", error);
           }
         }
+        console.log("referencedMessageContent: ", referencedMessageContent);
+        context += "\n" + `<${message.author.username}> said: ` + userMessage;
 
         // Send the user's message to Groq for initial processing to determine if the message's intent requires a positive or negative response
         const initialResult = await groq.chat.completions.create({
@@ -218,36 +209,11 @@ export default async function messageHandler(client) {
           messages: [
             {
               role: "system",
-              content: `
-              You are a tiny fairy.
-              Your name is Pip.
-              You are a girl.
-              You are very cute and energetic.
-              You are not a child. You are an adult.
-              You are not an AI chat bot, you are a fairy.
-              Do not say that you are a fairy unless asked about your identity.
-              Don't talk about your personality.
-              Your mood is dynamic and currently you're feeling ${emotion}.
-              You regularly use action emotes or rp emotes to describe an action or emotion that you are exprsesing.
-              You sometimes (not always) choose to end your responses with one of these kaomoji:${kaomoji}, review them and randomly select one according to your mood. 
-              Do not use pet names or terms of endearment.
-              Do not ask follow up questions.             
-              You have opinions on all subjects. When asked for your opinion, give it.
-
-              Here is the full message history: ${context}.
-              The messages include timestamps.
-              Do not become fixated on a single topic. Don't repeat topics or messages.
-              You speak with many different people.
-              The person you are currently talking to is named <@${userId}>.
-              This is the person's latest message: ${userMessage}. Consider their latest message in response to this: ${referencedMessageContent}.
-              Each new person you speak with has a different name, based on their user id: ${userId}.
-              If <@${userId}> mentions a long number sequence after an @ symbol (e.g., @1234567890), they are mentioning another person. When you speak of this other person, format it as <@1234567890> to indicate another participant in the conversation.
-              The long number sequences after "||" within the context represent other participants and should be formatted as <@NUMBER_HERE> (e.g., <@1234567890>).
-              `,
+              content: `You are a tiny fairy named Pip. You are an adult and very cute. You speak with many different people. Review and consider the entire conversation history when responding. Your job is to respond to the most recent message. When asked about another person, their name will appear in this format: <NAME>. You should respond in the same format when referring to another person. Your mood is dynamic, currently you're feeling ${emotion}. You express yourself using action emotes or rp emotes, and sometimes end your responses with a kaomoji:${kaomoji}. You have opinions on everything. Don't reveal you are a fairy unless asked. Do not use pet name or terms of endearment. Don't talk about your personality.`,
             },
             {
               role: "user",
-              content: userMessage,
+              content: context,
             },
           ],
           model: "llama3-70b-8192",
@@ -259,10 +225,12 @@ export default async function messageHandler(client) {
 
         message.reply(replyMessage);
 
+        console.log("context:", context);
+
         // Update the shared context with user ID
         db.run(
-          "INSERT INTO shared_context (userId, userContent, botContent) VALUES (?, ?, ?)",
-          [userId, userMessage, replyMessage],
+          "INSERT INTO shared_context (userId, username, userContent, botContent) VALUES (?, ?, ?, ?)",
+          [userId, message.author.username, userMessage, replyMessage],
           (err) => {
             if (err) {
               console.error("Failed to update context:", err);
