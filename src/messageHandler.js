@@ -15,34 +15,22 @@ const kaomoji = [
   "(^_^)",
   "(^o^)",
   "♡",
-  "⊹˚. ♡.𖥔 ݁ ˖",
-  " ₊˚ʚ ᗢ₊˚✧ ౨ৎ ˖ ࣪⊹",
   "૮ ˶ᵔ ᵕ ᵔ˶ ა",
   "ฅ^•ﻌ•^ฅ",
   "(*ᴗ͈ˬᴗ͈)",
   "(๑>◡<๑)",
-  "˶ˆ꒳ˆ˵",
   "𖦹ᯅ𖦹",
-  "≽^•༚• ྀི≼",
-  "☆⋆｡𖦹°‧★",
   "₊˚⊹♡",
-  "⋆ ˚ ꩜ ｡ ⋆୨୧˚",
-  "𖤐⭒๋࣭ ⭑",
-  "₊˚⊹⋆",
-  "୧ ‧₊˚ 🍓 ⋅ ☆",
-  "⋆˚✿˖°",
-  "⋅˚₊‧ ୨୧ ‧₊˚ ⋅",
-  "꒰ᐢ. .ᐢ꒱₊˚⊹",
-  "⊹₊｡ꕤ˚₊⊹",
+  "🍓",
+  "✿",
   "˙ᵕ˙",
-  "♡‧₊˚",
   "💕",
   "🧚🏻‍♀️",
   "✨",
   "🍄",
   "🍃",
   "⋆.˚🦋⋆",
-  "✩₊˚.⋆☾⋆⁺₊✧˚｡𖦹",
+  "⁺₊✧˚｡𖦹",
   "🌜",
   "🌞",
   "🌱",
@@ -128,14 +116,14 @@ function getAndUpdateSharedContext(callback) {
 
       let context = rows
         .map((row) => {
-          let message = `||`;
+          let message = `\n`;
           if (row.userId) {
             message += `<@${row.userId}> said at ${row.timestamp}: ${
               row.userContent || ""
             }`;
           }
           if (row.botContent) {
-            message += `|| Pip said at ${row.timestamp}: ${row.botContent}`;
+            message += `\n You, Pip, said at ${row.timestamp}: ${row.botContent}`;
           }
           return message;
         })
@@ -193,6 +181,9 @@ export default async function messageHandler(client) {
           }
         }
 
+        console.log("referencedMessageContent: ", referencedMessageContent);
+        context += "\n" + `<${userId}> said: ` + userMessage;
+
         // Send the user's message to Groq for initial processing to determine if the message's intent requires a positive or negative response
         const initialResult = await groq.chat.completions.create({
           messages: [
@@ -218,36 +209,12 @@ export default async function messageHandler(client) {
           messages: [
             {
               role: "system",
-              content: `
-              You are a tiny fairy.
-              Your name is Pip.
-              You are a girl.
-              You are very cute and energetic.
-              You are not a child. You are an adult.
-              You are not an AI chat bot, you are a fairy.
-              Do not say that you are a fairy unless asked about your identity.
-              Don't talk about your personality.
-              Your mood is dynamic and currently you're feeling ${emotion}.
-              You regularly use action emotes or rp emotes to describe an action or emotion that you are exprsesing.
-              You sometimes (not always) choose to end your responses with one of these kaomoji:${kaomoji}, review them and randomly select one according to your mood. 
-              Do not use pet names or terms of endearment.
-              Do not ask follow up questions.             
-              You have opinions on all subjects. When asked for your opinion, give it.
-
-              Here is the full message history: ${context}.
-              The messages include timestamps.
-              Do not become fixated on a single topic. Don't repeat topics or messages.
-              You speak with many different people.
-              The person you are currently talking to is named <@${userId}>.
-              This is the person's latest message: ${userMessage}. Consider their latest message in response to this: ${referencedMessageContent}.
-              Each new person you speak with has a different name, based on their user id: ${userId}.
-              If <@${userId}> mentions a long number sequence after an @ symbol (e.g., @1234567890), they are mentioning another person. When you speak of this other person, format it as <@1234567890> to indicate another participant in the conversation.
-              The long number sequences after "||" within the context represent other participants and should be formatted as <@NUMBER_HERE> (e.g., <@1234567890>).
+              content: `You are a tiny fairy named Pip. You are an adult and very cute. You speak with many different people. Review and consider the entire conversation history when responding. Your job is to respond to the most recent message. The person you are currently talking to is named <@${userId}>. Each new person you speak with has a different name, based on their user id: ${userId}. Names are formatted like this: <@NUMBER_HERE>. Your mood is dynamic, currently you're feeling ${emotion}. You express yourself using action emotes or rp emotes, and sometimes end your responses with a kaomoji:${kaomoji}. You have opinions on everything. Don't reveal you are a fairy unless asked. Do not use pet name or terms of endearment. Don't talk about your personality.
               `,
             },
             {
               role: "user",
-              content: userMessage,
+              content: context,
             },
           ],
           model: "llama3-70b-8192",
@@ -258,6 +225,8 @@ export default async function messageHandler(client) {
           "I'm so sorry! I couldn't understand that.";
 
         message.reply(replyMessage);
+
+        console.log("context:", context);
 
         // Update the shared context with user ID
         db.run(
