@@ -81,7 +81,7 @@ function selectEmotion(initialResponse) {
 // Function to get/update shared context table
 function getAndUpdateSharedContext(callback) {
   db.all(
-    "SELECT userId, userContent, botContent, timestamp FROM shared_context ORDER BY timestamp DESC LIMIT 20",
+    "SELECT userId, userContent, botContent, timestamp FROM shared_context ORDER BY timestamp DESC LIMIT 200",
     (err, rows) => {
       if (err) return callback(err);
 
@@ -101,13 +101,13 @@ function getAndUpdateSharedContext(callback) {
         .join("\n");
 
       // Trim if exceeding length
-      if (context.length > 4000) {
-        context = context.slice(context.length - 4000);
+      if (context.length > 28000) {
+        context = context.slice(context.length - 28000);
       }
 
       // Delete older entries
       db.run(
-        "DELETE FROM shared_context WHERE id NOT IN (SELECT id FROM shared_context ORDER BY id DESC LIMIT 20)",
+        "DELETE FROM shared_context WHERE id NOT IN (SELECT id FROM shared_context ORDER BY id DESC LIMIT 200)",
         (err) => {
           if (err) {
             console.error("Failed to delete old context entries:", err);
@@ -208,7 +208,7 @@ export default async function messageHandler(client) {
               content: context,
             },
           ],
-          model: "llama3-70b-8192",
+          model: "llama3-8b-8192",
         });
 
         const replyMessage =
