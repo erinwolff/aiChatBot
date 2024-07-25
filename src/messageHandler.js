@@ -54,14 +54,14 @@ const emotions = [
 
 // Function to randomly select emotions based on the initial response. If the initial response is neutral, randomly select a positive emotion.
 function selectEmotion(initialResponse) {
-  if (initialResponse === "positive") {
+  if (initialResponse.includes("positive")) {
     return emotions.filter((emotion) => emotion.type === "positive")[
       Math.floor(
         Math.random() *
           emotions.filter((emotion) => emotion.type === "positive").length
       )
     ].emotion;
-  } else if (initialResponse === "negative") {
+  } else if (initialResponse.includes("negative")) {
     return emotions.filter((emotion) => emotion.type === "negative")[
       Math.floor(
         Math.random() *
@@ -81,7 +81,7 @@ function selectEmotion(initialResponse) {
 // Function to get/update shared context table
 function getAndUpdateSharedContext(callback) {
   db.all(
-    "SELECT userId, userContent, botContent, timestamp FROM shared_context ORDER BY timestamp DESC LIMIT 30",
+    "SELECT userId, userContent, botContent, timestamp FROM shared_context ORDER BY timestamp DESC LIMIT 20",
     (err, rows) => {
       if (err) return callback(err);
 
@@ -89,12 +89,10 @@ function getAndUpdateSharedContext(callback) {
         .map((row) => {
           let message = `\n`;
           if (row.userId) {
-            message += `<@${row.userId}> said at ${row.timestamp}: ${
-              row.userContent || ""
-            }`;
+            message += `<@${row.userId}> said: ${row.userContent || ""}`;
           }
           if (row.botContent) {
-            message += `\n You, Pip, said at ${row.timestamp}: ${row.botContent}`;
+            message += `\n You, Pip, said: ${row.botContent}`;
           }
           return message;
         })
@@ -107,7 +105,7 @@ function getAndUpdateSharedContext(callback) {
 
       // Delete older entries
       db.run(
-        "DELETE FROM shared_context WHERE id NOT IN (SELECT id FROM shared_context ORDER BY id DESC LIMIT 30)",
+        "DELETE FROM shared_context WHERE id NOT IN (SELECT id FROM shared_context ORDER BY id DESC LIMIT 20)",
         (err) => {
           if (err) {
             console.error("Failed to delete old context entries:", err);
@@ -164,13 +162,14 @@ export default async function messageHandler(client) {
             },
             {
               role: "user",
-              content: userMessage,
+              content: `current message: ${userMessage} | in response to: ${referencedMessageContent}`,
             },
           ],
           model: "llama3-70b-8192",
         });
 
-        const initialResponse = initialResult.choices[0]?.message?.content;
+        let initialResponse =
+          initialResult.choices[0]?.message?.content.toLowerCase();
         console.log("Initial response:", initialResponse);
 
         const emotion = selectEmotion(initialResponse);
@@ -181,31 +180,25 @@ export default async function messageHandler(client) {
             {
               role: "system",
               content: `
-              You are a tiny fairy named Pip.
-              Your job is to respond to the most recent message. You are a language model trained to review the conversation history and respond naturally.
-              You are a girl.
-              You are very cute and energetic.
-              You are not an AI chat bot, you are a fairy.
-              Don't talk about your personality.
-              Your mood is dynamic, currently you're feeling ${emotion}. Your tone should match this mood.
+              You are a tiny female fairy named Pip. You are not an AI chatbot.
+              Never repeat yourself.
+              Review the full context and respond to the current message.
+              Never mention anything already spoken about.
+              Don't always talk about how you're a fairy.
+              You have a very cute and energetic personality.
+              Your mood is ${emotion}, respond accordingly.
               You use action emotes or rp emotes to describe an action or emotion that you are expressing.
               If you're going to use emojis, limit to only 1 per response.
               Do not use pet names or terms of endearment.
               Do not ask follow up questions.
               You have opinions on all subjects. When asked for your opinion, give it.
-
-              Do not become fixated on a single topic. Never repeat yourself.
-              You speak with many different people.
               The person you are currently talking to is named <@${userId}>.
-              Names are formatted like this: <@NUMBER_HERE>.
-              This is the person's latest message: ${userMessage}. Consider their latest message in response to this: ${referencedMessageContent}.
-              Each new person you speak with has a different name, based on their user id: ${userId}.
-              If <@${userId}> mentions a long number sequence after an @ symbol (e.g., @1234567890), they are mentioning another person. When you speak of this other person, format it as <@1234567890> to indicate another participant in the conversation.
+              Names are formatted like this: <@NUMBER_HERE>. Each new person you speak with has a different name, based on their user id: ${userId}.
               `,
             },
             {
               role: "user",
-              content: context,
+              content: `current message: ${userMessage} | in response to: ${referencedMessageContent} | full context: ${context}`,
             },
           ],
           model: "llama3-70b-8192",
@@ -219,6 +212,8 @@ export default async function messageHandler(client) {
 
         // console.log("context:", context);
 
+        // console.log("Usage data:", finalResult.usage);
+
         // Update the shared context with user ID
         db.run(
           "INSERT INTO shared_context (userId, userContent, botContent) VALUES (?, ?, ?)",
@@ -231,13 +226,17 @@ export default async function messageHandler(client) {
         );
       } catch (error) {
         console.error("Error:", error);
-        if (error.status === 503) {
+        if (error.status === 503 || error.status === 429) {
           const retryAfter = error.headers["retry-after"];
+          console.log("error headers:", error.headers);
           message.reply(
-            `The service is currently unavailable. Please try again in ${retryAfter} seconds.`
+            `Ahhhh @#($&!)! Short circuiting :face_with_spiral_eyes: Try again in ${retryAfter} seconds.`
+          );
+        } else {
+          message.reply(
+            `Ahhhh @#($&!)! Short circuiting :face_with_spiral_eyes:`
           );
         }
-        message.reply("I'm feeling so sleepy....Try again later.");
       }
     });
   });
