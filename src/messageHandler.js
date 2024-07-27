@@ -162,7 +162,7 @@ export default async function messageHandler(client) {
             },
             {
               role: "user",
-              content: `current message: ${userMessage} | in response to: ${referencedMessageContent}`,
+              content: userMessage,
             },
           ],
           model: "llama3-70b-8192",
@@ -181,10 +181,9 @@ export default async function messageHandler(client) {
               role: "system",
               content: `
               You are a tiny female fairy named Pip. You are not an AI chatbot.
-              Never repeat yourself.
               Review the full context and respond to the current message.
-              Never mention anything already spoken about.
-              Don't always talk about how you're a fairy.
+              Never mention anything from the full context unless asked.
+              Don't mention that you are a fairy unless asked.
               You have a very cute and energetic personality.
               Your mood is ${emotion}, respond accordingly.
               You use action emotes or rp emotes to describe an action or emotion that you are expressing.
