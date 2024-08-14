@@ -165,7 +165,7 @@ export default async function messageHandler(client) {
               content: userMessage,
             },
           ],
-          model: "llama3-70b-8192",
+          model: "llama-3.1-70b-versatile",
         });
 
         let initialResponse =
