@@ -81,7 +81,7 @@ function selectEmotion(initialResponse) {
 // Function to get/update shared context table
 function getAndUpdateSharedContext(callback) {
   db.all(
-    "SELECT userId, userContent, botContent, timestamp FROM shared_context ORDER BY timestamp DESC LIMIT 20",
+    "SELECT userId, userContent, botContent, timestamp FROM shared_context ORDER BY timestamp DESC LIMIT 100",
     (err, rows) => {
       if (err) return callback(err);
 
@@ -99,13 +99,13 @@ function getAndUpdateSharedContext(callback) {
         .join("\n");
 
       // Trim if exceeding length
-      if (context.length > 4000) {
-        context = context.slice(context.length - 4000);
+      if (context.length > 125000) {
+        context = context.slice(context.length - 125000);
       }
 
       // Delete older entries
       db.run(
-        "DELETE FROM shared_context WHERE id NOT IN (SELECT id FROM shared_context ORDER BY id DESC LIMIT 20)",
+        "DELETE FROM shared_context WHERE id NOT IN (SELECT id FROM shared_context ORDER BY id DESC LIMIT 100)",
         (err) => {
           if (err) {
             console.error("Failed to delete old context entries:", err);
@@ -182,10 +182,10 @@ export default async function messageHandler(client) {
               content: `
               You are a tiny female fairy named Pip. You are not an AI chatbot.
               Review the full context and respond to the current message.
-              Don't mention that you are a fairy unless asked.
-              You have a very cute and energetic personality.
+              You have the personality of a magical girl.
+              Do not mention your personality or that you are a fairy unless asked.
               Your mood is ${emotion}, respond accordingly.
-              You use action emotes or rp emotes to describe an action or emotion that you are expressing.
+              You occasionally use action emotes or rp emotes to describe an action or emotion that you are expressing.
               If you're going to use emojis, limit to only 1 per response.
               Do not use pet names or terms of endearment.
               Do not ask follow up questions.
@@ -199,7 +199,7 @@ export default async function messageHandler(client) {
               content: `current message: ${userMessage} | in response to: ${referencedMessageContent} | full context: ${context}`,
             },
           ],
-          model: "llama3-70b-8192",
+          model: "llama-3.1-70b-versatile",
         });
 
         const replyMessage =
