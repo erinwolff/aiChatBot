@@ -99,8 +99,8 @@ function getAndUpdateSharedContext(callback) {
         .join("\n");
 
       // Trim if exceeding length
-      if (context.length > 125000) {
-        context = context.slice(context.length - 125000);
+      if (context.length > 90000) {
+        context = context.slice(context.length - 90000);
       }
 
       // Delete older entries
