@@ -121,6 +121,11 @@ function getAndUpdateSharedContext(callback) {
 export default async function messageHandler(client) {
   client.on("messageCreate", async (message) => {
     if (!message.mentions.has(botId)) return;
+    if (
+      message.content.includes("@everyone") ||
+      message.content.includes("@here")
+    )
+      return;
 
     const userId = message.author.id;
     const userMessage = message.content.replace(`<@${botId}>`, "").trim();
