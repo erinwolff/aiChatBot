@@ -11,30 +11,6 @@ db.run(
 const groq = new Groq({ apiKey: config.QROQ_API_KEY });
 const botId = config.client_id;
 
-// Function to summarize the context and avoid repetition
-async function summarizeContext(context) {
-  const summaryResult = await groq.chat.completions.create({
-    messages: [
-      {
-        role: "system",
-        content: `
-          You are an advanced AI summarization assistant. Summarize the following conversation context, focusing on the main topics and the tone of the conversation.
-          Do not sanitize or censor the content.
-          Ensure that the summary is concise but includes the intent and nature of the discussion. 
-          Do not exceed 500 characters.
-        `,
-      },
-      {
-        role: "user",
-        content: context,
-      },
-    ],
-    model: "llama-3.1-8b-instant",
-  });
-
-  return summaryResult.choices[0]?.message?.content.trim() || "";
-}
-
 // Function to get/update shared context table and track recent topics
 function getAndUpdateSharedContext(callback) {
   db.all(
@@ -44,12 +20,12 @@ function getAndUpdateSharedContext(callback) {
 
       let context = rows
         .map((row) => {
-          let message = `\n`;
+          let message = `[${new Date(row.timestamp).toLocaleString()}] `;
           if (row.userId) {
             message += `<@${row.userId}> said: ${row.userContent || ""}`;
           }
           if (row.botContent) {
-            message += `\n You, Pip, said: ${row.botContent}`;
+            message += `\n[${new Date(row.timestamp).toLocaleString()}] You, Pip, said: ${row.botContent}`;
           }
           return message;
         })
@@ -61,10 +37,6 @@ function getAndUpdateSharedContext(callback) {
       }
 
       try {
-        // Summarize the context to keep it concise and informative
-        const summarizedContext = await summarizeContext(context);
-        console.log("Summarized context:", summarizedContext);
-
         // Delete older entries and only then pass the summarized context
         db.run(
           "DELETE FROM shared_context WHERE id NOT IN (SELECT id FROM shared_context ORDER BY id DESC LIMIT 20)",
@@ -73,7 +45,7 @@ function getAndUpdateSharedContext(callback) {
               console.error("Failed to delete old context entries:", err);
             }
             // Call the callback here, ensuring it's called only once
-            callback(null, summarizedContext);
+            callback(null, context);
           }
         );
       } catch (summaryError) {
@@ -85,21 +57,13 @@ function getAndUpdateSharedContext(callback) {
 }
 
 // New function to create dynamic prompts and avoid repetition
-function createUniquePrompt(summarizedContext, incomingMessageMood, userId) {
+function createUniquePrompt(userId) {
   return `
-    You are a tiny female fairy named Pip.    
-    Do not mention your personality or that you are a fairy unless asked.                  
-    This is the summarized conversation context:
-    "${summarizedContext}"
-    
+    You are a tiny female fairy named Pip.  
     Keep your responses short and to the point. 
     You have the personality of a cute magical girl.
-    Do not mention your personality or that you are a fairy unless asked.   
-    The tone of the incoming user message is ${incomingMessageMood}, respond accordingly.
-    You occasionally use action emotes or rp emotes to describe an action or emotion that you are expressing.
-    If you're going to use emojis, limit to only 1 per response.
+    You occasionally use action emotes, rp emotes, or emojis to describe an action or emotion that you are expressing.
     Do not use pet names or terms of endearment.
-    Do not ask follow up questions.
     You have opinions on all subjects. When asked for your opinion, give it.
     The person you are currently talking to is named <@${userId}>.
     Names are formatted like this: <@NUMBER_HERE>. Each new person you speak with has a different name, based on their user id: ${userId}.
@@ -117,7 +81,7 @@ export default async function messageHandler(client) {
 
     const userId = message.author.id;
     const userMessage = message.content.replace(`<@${botId}>`, "").trim();
-    console.log("userMessage: ", userMessage);
+    // console.log("userMessage: ", userMessage);
 
     let referencedMessageId = null;
     if (message.reference) {
@@ -125,7 +89,7 @@ export default async function messageHandler(client) {
     }
 
     // Retrieve the user's context from the database
-    getAndUpdateSharedContext(async (err, summarizedContext) => {
+    getAndUpdateSharedContext(async (err, context) => {
       if (err) {
         console.error("Database error:", err);
         return;
@@ -139,53 +103,10 @@ export default async function messageHandler(client) {
           } catch (error) {
             console.error("Failed to fetch referenced message:", error);
           }
-        }
-
-        async function classifyMood(content) {
-          const moodResult = await groq.chat.completions.create({
-            messages: [
-              {
-                role: "system",
-                content: `
-                  You are an advanced AI tasked with determining the mood of the following content.
-                  You must analyze the context provided and respond with one ONLY of these moods:
-                  - 'positive'
-                  - 'neutral'
-                  - 'negative'
-                  - 'sarcastic'
-                  - 'angry'                 
-        
-                  Do not provide any explanations, additional information, or context. Simply respond with one word that matches the mood.
-                `,
-              },
-              {
-                role: "user",
-                content,
-              },
-            ],
-            model: "llama-3.1-8b-instant",
-          });
-        
-          // Extract the response and trim any extra spaces
-          const rawMood = moodResult.choices[0]?.message?.content.trim().toLowerCase();
-          console.log('Raw mood:', rawMood);
-        
-          // Valid moods for comparison
-          const validMoods = ['positive', 'neutral', 'negative', 'sarcastic', 'angry'];
-        
-          // Match the response to one of the valid moods
-          const matchedMood = validMoods.find((mood) => rawMood === mood);
-        
-          // Default to 'neutral' if the response does not match any of the valid moods
-          return matchedMood || 'neutral';
-        }
-
-        // Next, classify the mood of the incoming user message
-        const incomingMessageMood = await classifyMood(userMessage);
-        console.log('Mood of incoming user message:', incomingMessageMood);
+        }      
 
         // Use the dynamic prompt creator
-        const dynamicPrompt = createUniquePrompt(summarizedContext, incomingMessageMood, userId);
+        const dynamicPrompt = createUniquePrompt(userId);
 
         const finalResult = await groq.chat.completions.create({
           messages: [
@@ -197,8 +118,12 @@ export default async function messageHandler(client) {
               role: "user",
               content: `current message: ${userMessage} | in response to: ${referencedMessageContent}`,
             },
+            {
+              role: "user",
+              content: `Previous context:\n${context}`,
+            },
           ],
-          model: "llama-3.1-8b-instant",
+          model: "llama-3.2-90b-vision-preview",
         });
 
         const replyMessage =
