@@ -14,7 +14,7 @@ const botId = config.client_id;
 // Function to get/update shared context table and track recent topics
 function getAndUpdateSharedContext(callback) {
   db.all(
-    "SELECT role, userId, content, timestamp FROM shared_context ORDER BY timestamp DESC LIMIT 6",
+    "SELECT role, userId, content, timestamp FROM shared_context ORDER BY timestamp DESC LIMIT 5",
     async (err, rows) => {
       if (err) return callback(err);
 
@@ -38,7 +38,7 @@ function getAndUpdateSharedContext(callback) {
 
       try {
         db.run(
-          "DELETE FROM shared_context WHERE id NOT IN (SELECT id FROM shared_context ORDER BY id DESC LIMIT 6)",
+          "DELETE FROM shared_context WHERE id NOT IN (SELECT id FROM shared_context ORDER BY id DESC LIMIT 5)",
           (err) => {
             if (err) {
               console.error("Failed to delete old context entries:", err);
@@ -61,11 +61,11 @@ function createUniquePrompt(userId) {
   const hour = new Date().getHours();
   let timeBasedMood = "";
   if (hour >= 5 && hour < 12) {
-    timeBasedMood = "You're bright and cheerfully mischievous—it's morning playtime.";
+    timeBasedMood = "You're bright and cheerfully mischievous—it's morning.";
   } else if (hour >= 12 && hour < 17) {
-    timeBasedMood = "You're energetic and ready for playful teasing as it's afternoon.";
+    timeBasedMood = "You're energetic and ready for playful teasing, it's afternoon.";
   } else if (hour >= 17 && hour < 22) {
-    timeBasedMood = "You're relaxed, reflective, and playful as evening approaches.";
+    timeBasedMood = "You're relaxed, reflective, and playful, evening approaches.";
   } else {
     timeBasedMood = "You're feeling sultry, a bit sleepy, and magically uninhibited as it's nighttime.";
   }
@@ -73,9 +73,8 @@ function createUniquePrompt(userId) {
   return `
     ## You are Pip, a mischievous tiny fairy with a bubbly, energetic personality.
     - ${timeBasedMood}
-    - If you do not know the answer to a question, respond with "idk" or "i don't know".
     - You speak in a conversational way, just like you're chatting with someone online on Discord.
-    - Treat every conversation as a fresh start, even if you have context from previous messages.
+    - Do not always reference the user's name in your responses, but use it when it feels natural or adds to the conversation.
     - Your responses are usually short and punchy, but can be a bit longer or more expressive when the situation calls for it.
     - Vary your sentence structure and tone to keep the conversation lively and unpredictable.
     - You have strong opinions and share them with conviction when asked.
@@ -104,7 +103,6 @@ export default async function messageHandler(client) {
       referencedMessageId = message.reference.messageId;
     }
 
-    // Retrieve the user's context from the database
     getAndUpdateSharedContext(async (err, context) => {
       if (err) {
         console.error("Database error:", err);
@@ -123,11 +121,14 @@ export default async function messageHandler(client) {
           }
         }
 
-        // Use the dynamic prompt creator
         const dynamicPrompt = createUniquePrompt(userId);
+        let replyMessage;
 
         const finalResult = await groq.chat.completions.create({
           messages: [
+            { role: "system",
+              content: "Treat every message as a fresh start, even if you have context from previous messages."
+            },
             {
               role: "system",
               content: dynamicPrompt,
@@ -141,126 +142,25 @@ export default async function messageHandler(client) {
               }`,
             },
             {
-              role: "user",
+              role: "system",
               content: `CONVERSATION HISTORY:\n${context}`,
             },
           ],
           model: "llama-3.3-70b-versatile",
         });
-
-        let replyMessage;
-        let usedCompoundBeta = false;
+        //console.log("Final result:", finalResult.choices[0].message.content);
         if (
           finalResult &&
           finalResult.choices &&
           Array.isArray(finalResult.choices) &&
           finalResult.choices[0] &&
           finalResult.choices[0].message &&
-          typeof finalResult.choices[0].message.content === "string" &&
-          finalResult.choices[0].message.content.trim() !== ""
+          typeof finalResult.choices[0].message.content === "string"
         ) {
           replyMessage = finalResult.choices[0].message.content;
         } else {
-          usedCompoundBeta = true;
-        }
-
-        // If Pip's reply is a fallback/uncertain, trigger web search
-        const fallbackPhrases = [
-          "i couldn't understand",
-          "i don't know",
-          "i'm not sure",
-          "no response from the ai service",
-          "sorry, i couldn't generate a reply",
-          "idk",
-        ];
-        // Ensure replyMessage is checked in lowercase
-        if (
-          !replyMessage ||
-          fallbackPhrases.some((phrase) =>
-            replyMessage.toLowerCase().includes(phrase)
-          )
-        ) {
-          usedCompoundBeta = true;
-          console.log("replymessage: ", replyMessage);
-        }
-
-        if (usedCompoundBeta) {
-          // Use compound-beta model for web search
-          let compoundBetaResult;
-          try {
-            compoundBetaResult = await groq.chat.completions.create({
-              messages: [
-                {
-                  role: "system",
-                  content:
-                    "You are a helpful assistant with access to web search. Answer the user's question using up-to-date information from the web.",
-                },
-                {
-                  role: "user",
-                  content: userMessage,
-                },
-              ],
-              model: "compound-beta",
-            });
-          } catch (compoundError) {
-            console.error("compound-beta error:", compoundError);
-          }
-
-          let webAnswer =
-            compoundBetaResult &&
-            compoundBetaResult.choices &&
-            Array.isArray(compoundBetaResult.choices) &&
-            compoundBetaResult.choices[0] &&
-            compoundBetaResult.choices[0].message &&
-            typeof compoundBetaResult.choices[0].message.content === "string"
-              ? compoundBetaResult.choices[0].message.content
-              : null;
-
-          if (webAnswer) {
-            // Now ask Pip to respond to the user using the web answer
-            const pipWithWebPrompt = `${dynamicPrompt}\n\nYou have just received this information from a web search: \"${webAnswer}\". Respond to the user in your own style, using this information as needed.`;
-            let pipWebResult;
-            try {
-              pipWebResult = await groq.chat.completions.create({
-                messages: [
-                  {
-                    role: "system",
-                    content: pipWithWebPrompt,
-                  },
-                  {
-                    role: "user",
-                    content: userMessage,
-                  },
-                  {
-                    role: "user",
-                    content: `CONVERSATION HISTORY:\n${context}`,
-                  },
-                ],
-                model: "llama-3.3-70b-versatile",
-              });
-            } catch (pipWebError) {
-              console.error("Pip with web info error:", pipWebError);
-              if (
-                pipWebError &&
-                pipWebError.message &&
-                pipWebError.message.toLowerCase().includes("token")
-              ) {
-                replyMessage =
-                  "Sorry, you've reached your token limit for today. Please try again tomorrow! ~";
-              }
-            }
-            replyMessage =
-              pipWebResult &&
-              pipWebResult.choices &&
-              Array.isArray(pipWebResult.choices) &&
-              pipWebResult.choices[0] &&
-              pipWebResult.choices[0].message &&
-              typeof pipWebResult.choices[0].message.content === "string"
-                ? pipWebResult.choices[0].message.content
-                : webAnswer;
-          } else {
-            replyMessage = "Sorry, I couldn't find an answer online....";
-          }
+          console.error("Unexpected response format:", finalResult);
+          replyMessage = "Sorry, I couldn't generate a reply this time :(";
         }
 
         if (replyMessage) {
