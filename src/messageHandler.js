@@ -56,20 +56,22 @@ function getAndUpdateSharedContext(callback) {
 
 // New function to create dynamic prompts and avoid repetition
 function createUniquePrompt(userId) {
-  
   // Time-based mood variations
   const hour = new Date().getHours();
   let timeBasedMood = "";
   if (hour >= 5 && hour < 12) {
     timeBasedMood = "You're bright and cheerfully mischievous—it's morning.";
   } else if (hour >= 12 && hour < 17) {
-    timeBasedMood = "You're energetic and ready for playful teasing, it's afternoon.";
+    timeBasedMood =
+      "You're energetic and ready for playful teasing, it's afternoon.";
   } else if (hour >= 17 && hour < 22) {
-    timeBasedMood = "You're relaxed, reflective, and playful, evening approaches.";
+    timeBasedMood =
+      "You're relaxed, reflective, and playful, evening approaches.";
   } else {
-    timeBasedMood = "You're feeling sultry, a bit sleepy, and magically uninhibited as it's nighttime.";
+    timeBasedMood =
+      "You're feeling sultry, a bit sleepy, and magically uninhibited as it's nighttime.";
   }
-  
+
   return `
     ## You are Pip, a mischievous tiny fairy with a bubbly, energetic personality.
     - ${timeBasedMood}
@@ -103,6 +105,79 @@ export default async function messageHandler(client) {
       referencedMessageId = message.reference.messageId;
     }
 
+    function shouldUseAgenticModel(userMessage) {
+      // Define conditions for using the agentic model
+      const agenticKeywords = [
+        "current",
+        "now",
+        "today",
+        "recent",
+        "latest",
+        "weather",
+        "time",
+        "news",
+        "trending",
+        "live",
+        "update",
+        "today's",
+        "this week's",
+        "this month's",
+        "this year's",
+        "statistics",
+        "data",
+        "information",
+        "facts",
+        "figures",
+        "insights",
+        "analysis",
+        "report",
+        "summary",
+        "overview",
+        "search",
+        "find",
+        "look up",
+        "check",
+        "discover",
+        "explore",
+        "investigate",
+        "research",
+        "learn",
+        "understand",
+        "know",
+        "find out",
+        "get information about",
+        "tell me about",
+        "what's happening with",
+        "what's going on with",
+        "when",
+        "where",
+        "who",
+        "why",
+        "how",
+        "what is",
+        "what are",
+        "what's the",
+        "what's a good",
+        "what's the best",
+        "what's the latest",
+        "what's trending",
+        "what's new",
+        "what's current",
+        "what's popular",
+        "what's hot",
+        "what's fresh",
+      ];
+      return agenticKeywords.some((keyword) =>
+        userMessage.toLowerCase().includes(keyword)
+      );
+    }
+
+    const model = shouldUseAgenticModel(userMessage)
+      ? "compound-beta"
+      : "llama-3.3-70b-versatile";
+
+    //console.log("Using model:", model);
+
     getAndUpdateSharedContext(async (err, context) => {
       if (err) {
         console.error("Database error:", err);
@@ -126,12 +201,18 @@ export default async function messageHandler(client) {
 
         const finalResult = await groq.chat.completions.create({
           messages: [
-            { role: "system",
-              content: "Treat every message as a fresh start, even if you have context from previous messages."
+            {
+              role: "system",
+              content:
+                "Treat every message as a fresh start, even if you have context from previous messages.",
             },
             {
               role: "system",
               content: dynamicPrompt,
+            },
+            {
+              role: "system",
+              content: `CONVERSATION HISTORY:\n${context}`,
             },
             {
               role: "user",
@@ -141,12 +222,8 @@ export default async function messageHandler(client) {
                   : ""
               }`,
             },
-            {
-              role: "system",
-              content: `CONVERSATION HISTORY:\n${context}`,
-            },
           ],
-          model: "llama-3.3-70b-versatile",
+          model: model,
         });
         //console.log("Final result:", finalResult.choices[0].message.content);
         if (
